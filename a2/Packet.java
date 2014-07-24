@@ -5,7 +5,7 @@ import java.nio.ByteBuffer;
 public class packet {
 	
 	// constants
-	private final int maxDataLength = 500;
+	private static final int maxDataLength = 500;
 	private final int SeqNumModulo = 32;
 	
 	// data members
@@ -55,6 +55,10 @@ public class packet {
 	
 	public byte[] getData() {
 		return data.getBytes();
+	}
+
+	public static int getMaxDataLength() {
+		return maxDataLength;
 	}
 	
 	//////////////////////////// UDP HELPERS ///////////////////////////////////////
