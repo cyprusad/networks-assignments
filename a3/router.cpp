@@ -193,37 +193,34 @@ void heavy_lifting(int router_id) {
       nbr_ids[hello.link_id] = hello.router_id;
     }
     usleep(20);
-    // send multiple LSPDU packets to the neighbors
+    // send multiple LSPDU packets to the neighbor who said hello to us
     unsigned char* data = (unsigned char*)malloc(sizeof(struct pkt_LSPDU));
-    map<int,int>::iterator it;
     int i;
-    // for each neighbour who has said hello to us, we send the circuit DB that we have
-    for (it = nbr_ids.begin(); it != nbr_ids.end(); ++it) {
-      for (i=0; i < circuit.nbr_link; i++) {
-        memset(data, 0, sizeof(struct pkt_LSPDU)); //clear data from prev iteration
-        struct pkt_LSPDU pdu;
-        pdu.sender = router_id;
-        pdu.router_id = router_id;
-        pdu.link_id = circuit.linkcost[i].link;
-        pdu.cost = circuit.linkcost[i].cost;
-        pdu.via = it->first; // the via is the link of the neighbour in the neighbours map 
-        memcpy(data, &pdu, sizeof(pdu)); //copy pdu packet into data
+    // when a neighbour has said hello to us, we send the circuit DB that we have to the neighbour
+    for (i=0; i < circuit.nbr_link; i++) {
+      memset(data, 0, sizeof(struct pkt_LSPDU)); //clear data from prev iteration
+      struct pkt_LSPDU pdu;
+      pdu.sender = router_id;
+      pdu.router_id = router_id;
+      pdu.link_id = circuit.linkcost[i].link;
+      pdu.cost = circuit.linkcost[i].cost;
+      pdu.via = hello.link_id; // the via is the link of the neighbour who said hello 
+      memcpy(data, &pdu, sizeof(pdu)); //copy pdu packet into data
 
-        printf("heavy_lifiting - R%d sending PDU via link=%d\n", router_id, it->first);
+      printf("heavy_lifiting - R%d sending PDU via link=%d\n", pdu.sender, pdu.via);
 
-        if ((numbytes = sendto(sockfd, data, sizeof(pdu), 0,
-                     p->ai_addr, p->ai_addrlen)) == -1) {
-          perror("router: sendto");
-          exit(1);
-        }
-
-        printf("heavy_lifting :: send_pdu - we sent %d bytes to the NSE\n", numbytes);
-
-        // log sending the LSPDU
-        char logging[256];
-        sprintf(logging, "R%d:SEND LSPDU packet via link_id=%d\n", router_id, pdu.via);
-        router_log(logging);
+      if ((numbytes = sendto(sockfd, data, sizeof(pdu), 0,
+                   p->ai_addr, p->ai_addrlen)) == -1) {
+        perror("router: sendto");
+        exit(1);
       }
+
+      printf("heavy_lifting :: send_pdu - we sent %d bytes to the NSE\n", numbytes);
+
+      // log sending the LSPDU
+      char logging[256];
+      sprintf(logging, "R%d:SEND LSPDU packet via link_id=%d\n", router_id, pdu.via);
+      router_log(logging);
     }
 
   } else if (numbytes == sizeof(struct pkt_LSPDU)) {
