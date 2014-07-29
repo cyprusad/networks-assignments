@@ -8,6 +8,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <unistd.h>
+
+#include <map>
 
 #include "router.h"
 
@@ -23,7 +26,7 @@ int router_port;
 
 char filename[64]; // filename string specific to the router
 struct circuit_DB circuit; // circuit DB provided by the NSE 
-struct neighbour* nbr_root; // unchanging first node of neighbour linked list
+map<int, int> nbr_ids; // if nbr_ids.count(link_id) > 0, then router_id is a neighbour, else nbr_ids[link_id] = router_id
 
 // socket related variables
 int sockfd;
@@ -95,7 +98,6 @@ int send_hello(int router_id, struct circuit_DB* circuit) {
 
   //send hello messages to neighbors
   unsigned int num_nbrs = circuit->nbr_link;
-  struct pkt_HELLO greetings[num_nbrs];
   unsigned char* data = (unsigned char*)malloc(sizeof(struct pkt_HELLO));
   int i;
   for (i=0; i < num_nbrs; i++) {
@@ -184,11 +186,45 @@ void heavy_lifting(int router_id) {
     sprintf(logging, "R%d:RECEIVE - pkt_HELLO from R%d and link_id=%d\n", router_id, hello.router_id, hello.link_id);
     router_log(logging);
     // generate the neighbors list
-    
-
+    if (nbr_ids.count(hello.link_id) > 0) {
+      printf("heavy_lifting - R%d is already a neighbour\n", nbr_ids[hello.link_id]);
+    } else {
+      printf("heavy_lifting - R%d added as a neighbour\n", hello.router_id);
+      nbr_ids[hello.router_id] = hello.link_id;
+    }
+    usleep(20);
     // send multiple LSPDU packets to the neighbors
+    unsigned char* data = (unsigned char*)malloc(sizeof(struct pkt_LSPDU));
+    map<int,int>::iterator it;
+    int i;
+    // for each neighbour who has said hello to us, we send the circuit DB that we have
+    for (it = nbr_ids.begin(); it != nbr_ids.end(); ++it) {
+      for (i=0; i < circuit.nbr_link; i++) {
+        memset(data, 0, sizeof(struct pkt_LSPDU)); //clear data from prev iteration
+        struct pkt_LSPDU pdu;
+        pdu.sender = router_id;
+        pdu.router_id = router_id;
+        pdu.link_id = circuit.linkcost[i].link;
+        pdu.cost = circuit.linkcost[i].cost;
+        pdu.via = it->first; // the via is the link of the neighbour in the neighbours map 
+        memcpy(data, &pdu, sizeof(pdu)); //copy pdu packet into data
 
-    // log sending the LSPDU
+        printf("heavy_lifiting - R%d sending PDU via link=%d", router_id, it->first);
+
+        if ((numbytes = sendto(sockfd, data, sizeof(pdu), 0,
+                     p->ai_addr, p->ai_addrlen)) == -1) {
+          perror("router: sendto");
+          exit(1);
+        }
+
+        printf("heavy_lifting :: send_pdu - we sent %d bytes to the NSE\n", numbytes);
+
+        // log sending the LSPDU
+        char logging[256];
+        sprintf(logging, "R%d:SEND LSPDU packet via link_id=%d\n", router_id, pdu.via);
+        router_log(logging);
+      }
+    }
 
   } else if (numbytes == sizeof(struct pkt_LSPDU)) {
     printf("heavy_lifting - received an LSPDU packet\n");
@@ -251,13 +287,16 @@ int main (int argc, char** argv) {
 
   //recv database from NSE
   receive_circuitDB(router_id);
+  usleep(250);
 
   // send hello to all the neighbours
   send_hello(router_id, &circuit);
+  usleep(100);
 
   //loop between receiving hellos and LSPDUs
   while(1){
     heavy_lifting(router_id);
+    usleep(250);
   }
 
   return 0;
