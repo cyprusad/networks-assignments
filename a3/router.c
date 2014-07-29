@@ -13,6 +13,15 @@
 
 char filename[64]; // global filename string
 
+// get sockaddr, IPv4 or IPv6:
+void* get_in_addr(struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET) {
+        return &(((struct sockaddr_in*)sa)->sin_addr);
+    }
+
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
+}
 
 int router_log(char* data) {
   int res = 0;
@@ -51,7 +60,7 @@ int send_init(struct addrinfo* p, int sockfd, int router_id) {
 
   printf("send_init - we sent %d bytes to the NSE\n", numbytes);
 
-  router_log("INIT");
+  router_log("INIT\n");
   
   return 0;
 }
@@ -117,6 +126,25 @@ int main (int argc, char** argv) {
   send_init(p, sockfd, router_id);
 
   //recv database from NSE
+  char s[INET6_ADDRSTRLEN];
+  unsigned char recvBuffer[64];
+  struct sockaddr_storage their_addr;
+  socklen_t addr_len;
+  int numbytes;
+
+  printf("main - R%d is waiting to receive the circuitDB from NSE\n", router_id);
+  addr_len = sizeof(their_addr);
+  if ((numbytes = recvfrom(sockfd, recvBuffer, 64 , 0,
+          (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+    perror("main - recvfrom");
+    exit(1);
+  }
+
+  printf("main - router got packet from %s\n",
+          inet_ntop(their_addr.ss_family,
+              get_in_addr((struct sockaddr *)&their_addr),
+              s, sizeof s));
+  printf("main - router received packet which is %d bytes long\n", numbytes);
 
   return 0;
 }
