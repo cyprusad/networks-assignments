@@ -1,7 +1,7 @@
 default:	router
 
 router:
-			gcc router.c -o router
+			g++ router.cpp -o router
 
 clean:
 			rm -f router

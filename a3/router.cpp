@@ -11,6 +11,8 @@
 
 #include "router.h"
 
+using namespace std;
+
 /*  GLOBAL VARIABLES  */
 
 // router specific variables
@@ -21,6 +23,7 @@ int router_port;
 
 char filename[64]; // filename string specific to the router
 struct circuit_DB circuit; // circuit DB provided by the NSE 
+struct neighbour* nbr_root; // unchanging first node of neighbour linked list
 
 // socket related variables
 int sockfd;
@@ -172,7 +175,21 @@ void heavy_lifting(int router_id) {
   printf("heavy_lifting - router received packet which is %d bytes long\n", numbytes);
 
   if (numbytes == sizeof(struct pkt_HELLO)) {
-    printf("heavy_lifting - received HELLO");
+    printf("heavy_lifting - received HELLO\n");
+
+    struct pkt_HELLO hello;
+    memcpy(&hello, recvBuffer, sizeof(hello));
+    // log receiving the HELLO
+    char logging[124];
+    sprintf(logging, "R%d:RECEIVE - pkt_HELLO from R%d and link_id=%d\n", router_id, hello.router_id, hello.link_id);
+    router_log(logging);
+    // generate the neighbors list
+    
+
+    // send multiple LSPDU packets to the neighbors
+
+    // log sending the LSPDU
+
   } else if (numbytes == sizeof(struct pkt_LSPDU)) {
     printf("heavy_lifting - received an LSPDU packet\n");
   } else {
