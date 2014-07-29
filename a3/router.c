@@ -145,7 +145,7 @@ void receive_circuitDB(int sockfd, int router_id) {
   memcpy(&circuit, recvBuffer, sizeof(circuit));
 
   // log the receipt of this message
-  char logging[40];
+  char logging[50];
   sprintf(logging, "R%d:RECEIVE - circuitDB from the emulator\n", router_id);
   router_log(logging);
 }
