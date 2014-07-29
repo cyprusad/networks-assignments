@@ -12,6 +12,7 @@
 #include "router.h"
 
 char filename[64]; // global filename string
+struct circuit_DB circuit; // circuit DB provided by the NSE -- global
 
 // get sockaddr, IPv4 or IPv6:
 void* get_in_addr(struct sockaddr *sa)
@@ -63,6 +64,58 @@ int send_init(struct addrinfo* p, int sockfd, int router_id) {
   router_log("INIT\n");
   
   return 0;
+}
+
+int send_hello(struct addrinfo* p, int sockfd, int router_id, struct circuit_DB* circuit) {
+  int numbytes;
+
+  if (circuit == NULL) {
+    printf("send_hello - circuit DB wasn't correctly set up");
+  }
+
+  //send hello messages to neighbors
+  unsigned int num_nbrs = circuit->nbr_link;
+  struct pkt_HELLO greetings[num_nbrs];
+  unsigned char* data = (unsigned char*)malloc(sizeof(struct pkt_HELLO));
+  for (int i=0; i < num_nbrs; i++) {
+    memset(data, 0, sizeof(struct pkt_HELLO)); //clear data from prev iteration
+    struct pkt_HELLO hello;
+    hello.router_id = router_id;
+    hello.link_id = circuit->linkcost[i].link;
+    memcpy(data, &hello, sizeof(hello)); //copy hello packet into data
+
+    if ((numbytes = sendto(sockfd, data, sizeof(hello), 0,
+                 p->ai_addr, p->ai_addrlen)) == -1) {
+      perror("router: sendto");
+      exit(1);
+    }
+
+    printf("send_hello - we sent %d bytes to the NSE\n", numbytes);
+  }
+  return 0;
+}
+
+void receive_circuitDB(int sockfd) {
+  char s[INET6_ADDRSTRLEN];
+  unsigned char recvBuffer[64]; //max 44 bytes
+  struct sockaddr_storage their_addr;
+  socklen_t addr_len;
+  int numbytes;
+
+  addr_len = sizeof(their_addr);
+  if ((numbytes = recvfrom(sockfd, recvBuffer, 64 , 0,
+          (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+    perror("receive_circuitDB - recvfrom");
+    exit(1);
+  }
+
+  printf("receive_circuitDB - router got packet from %s\n",
+          inet_ntop(their_addr.ss_family,
+              get_in_addr((struct sockaddr *)&their_addr),
+              s, sizeof s));
+  printf("receive_circuitDB - router received packet which is %d bytes long\n", numbytes);
+
+  memcpy(&circuit, recvBuffer, sizeof(circuit));
 }
 
 void usage(int argc) {
@@ -126,25 +179,10 @@ int main (int argc, char** argv) {
   send_init(p, sockfd, router_id);
 
   //recv database from NSE
-  char s[INET6_ADDRSTRLEN];
-  unsigned char recvBuffer[64];
-  struct sockaddr_storage their_addr;
-  socklen_t addr_len;
-  int numbytes;
+  receive_circuitDB(sockfd);
 
-  printf("main - R%d is waiting to receive the circuitDB from NSE\n", router_id);
-  addr_len = sizeof(their_addr);
-  if ((numbytes = recvfrom(sockfd, recvBuffer, 64 , 0,
-          (struct sockaddr *)&their_addr, &addr_len)) == -1) {
-    perror("main - recvfrom");
-    exit(1);
-  }
-
-  printf("main - router got packet from %s\n",
-          inet_ntop(their_addr.ss_family,
-              get_in_addr((struct sockaddr *)&their_addr),
-              s, sizeof s));
-  printf("main - router received packet which is %d bytes long\n", numbytes);
+  // send hello to all the neighbours
+  send_hello(p, sockfd, router_id, &circuit);
 
   return 0;
 }
