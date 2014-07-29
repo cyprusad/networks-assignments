@@ -75,7 +75,7 @@ int send_init(struct addrinfo* p, int sockfd, int router_id) {
   printf("send_init - we sent %d bytes to the NSE\n", numbytes);
 
   // log this message
-  char logging[20];
+  char logging[30];
   sprintf(logging, "R%d:SEND - INIT\n", router_id);
   router_log(logging);
   
@@ -94,7 +94,7 @@ int send_hello(struct addrinfo* p, int sockfd, int router_id, struct circuit_DB*
   struct pkt_HELLO greetings[num_nbrs];
   unsigned char* data = (unsigned char*)malloc(sizeof(struct pkt_HELLO));
   int i;
-  char logging[40];
+  char logging[50];
   for (i=0; i < num_nbrs; i++) {
     memset(data, 0, sizeof(struct pkt_HELLO)); //clear data from prev iteration
     struct pkt_HELLO hello;
@@ -113,7 +113,7 @@ int send_hello(struct addrinfo* p, int sockfd, int router_id, struct circuit_DB*
     // log this message
     sprintf(logging, "R%d:SEND - HELLO to link_id:%d\n", router_id, hello.link_id);
     router_log(logging);
-
+    memset(&logging, 0, strlen(logging));
   }
 
   
