@@ -77,7 +77,8 @@ int send_hello(struct addrinfo* p, int sockfd, int router_id, struct circuit_DB*
   unsigned int num_nbrs = circuit->nbr_link;
   struct pkt_HELLO greetings[num_nbrs];
   unsigned char* data = (unsigned char*)malloc(sizeof(struct pkt_HELLO));
-  for (int i=0; i < num_nbrs; i++) {
+  int i;
+  for (i=0; i < num_nbrs; i++) {
     memset(data, 0, sizeof(struct pkt_HELLO)); //clear data from prev iteration
     struct pkt_HELLO hello;
     hello.router_id = router_id;
