@@ -54,7 +54,7 @@ int router_log(char* data) {
 }
 
 
-int send_init(struct addrinfo* p, int sockfd, int router_id) {
+int send_init(int router_id) {
   int numbytes;
 
   // send init package to the network emulator
@@ -82,7 +82,7 @@ int send_init(struct addrinfo* p, int sockfd, int router_id) {
   return 0;
 }
 
-int send_hello(struct addrinfo* p, int sockfd, int router_id, struct circuit_DB* circuit) {
+int send_hello(int router_id, struct circuit_DB* circuit) {
   int numbytes;
 
   if (circuit == NULL) {
@@ -122,7 +122,7 @@ int send_hello(struct addrinfo* p, int sockfd, int router_id, struct circuit_DB*
   return 0;
 }
 
-void receive_circuitDB(int sockfd, int router_id) {
+void receive_circuitDB(int router_id) {
   char s[INET6_ADDRSTRLEN];
   unsigned char recvBuffer[64]; //max 44 bytes
   struct sockaddr_storage their_addr;
@@ -150,14 +150,43 @@ void receive_circuitDB(int sockfd, int router_id) {
   router_log(logging);
 }
 
+
+void heavy_lifting(int router_id) {
+  char s[INET6_ADDRSTRLEN];
+  unsigned char recvBuffer[sizeof(struct pkt_LSPDU)]; //max of 5 ints
+  struct sockaddr_storage their_addr;
+  socklen_t addr_len;
+  int numbytes;
+
+  addr_len = sizeof(their_addr);
+  if ((numbytes = recvfrom(sockfd, recvBuffer, sizeof(struct pkt_LSPDU) , 0,
+          (struct sockaddr *)&their_addr, &addr_len)) == -1) {
+    perror("heavy_lifting - recvfrom");
+    exit(1);
+  }
+
+  printf("heavy_lifting - router got packet from %s\n",
+          inet_ntop(their_addr.ss_family,
+              get_in_addr((struct sockaddr *)&their_addr),
+              s, sizeof s));
+  printf("heavy_lifting - router received packet which is %d bytes long\n", numbytes);
+
+  if (numbytes == sizeof(struct pkt_HELLO)) {
+    printf("heavy_lifting - received HELLO");
+  } else if (numbytes == sizeof(struct pkt_LSPDU)) {
+    printf("heavy_lifting - received an LSPDU packet\n");
+  } else {
+    printf("heavy_lifting - received a bad packet\n");
+    exit(1);
+  }
+}
+
 void usage(int argc) {
   printf("Incorrect number of arguments. Required 4 but provided %d\n", --argc);
   printf("Usage:\n\trouter <router_id> <nse_host> <nse_port> <router_port>\n");
 }
 
 int main (int argc, char** argv) {
-
-
   if (argc != 5) {
     // error incorrect number of arguments
     usage(argc);
@@ -201,16 +230,18 @@ int main (int argc, char** argv) {
 
 
   // send init to the NSE
-  send_init(p, sockfd, router_id);
+  send_init(router_id);
 
   //recv database from NSE
-  receive_circuitDB(sockfd, router_id);
+  receive_circuitDB(router_id);
 
-  printf("main - sending HELLOs\n");
   // send hello to all the neighbours
-  send_hello(p, sockfd, router_id, &circuit);
+  send_hello(router_id, &circuit);
 
   //loop between receiving hellos and LSPDUs
+  while(1){
+    heavy_lifting(router_id);
+  }
 
   return 0;
 }
