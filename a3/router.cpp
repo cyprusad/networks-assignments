@@ -209,7 +209,7 @@ void heavy_lifting(int router_id) {
         pdu.via = it->first; // the via is the link of the neighbour in the neighbours map 
         memcpy(data, &pdu, sizeof(pdu)); //copy pdu packet into data
 
-        printf("heavy_lifiting - R%d sending PDU via link=%d", router_id, it->first);
+        printf("heavy_lifiting - R%d sending PDU via link=%d\n", router_id, it->first);
 
         if ((numbytes = sendto(sockfd, data, sizeof(pdu), 0,
                      p->ai_addr, p->ai_addrlen)) == -1) {
