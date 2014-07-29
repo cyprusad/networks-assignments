@@ -31,9 +31,28 @@ int router_log(char* data) {
 }
 
 
-int send_init(router_id) {
+int send_init(struct addrinfo* p, int sockfd, int router_id) {
+  int numbytes;
+
   // send init package to the network emulator
+  struct pkt_INIT init;
+  init.router_id = router_id;
+  printf("send_init - init.router_id = %d\n", init.router_id);
+  printf("send_init - size of init struct = %lu\n", sizeof(init));
+
+  unsigned char* data = (unsigned char*)malloc(sizeof(init));
+  memcpy(data, &init, sizeof(init));
+
+  if ((numbytes = sendto(sockfd, data, sizeof(init), 0,
+               p->ai_addr, p->ai_addrlen)) == -1) {
+    perror("router: sendto");
+    exit(1);
+  }
+
+  printf("send_init - we sent %d bytes to the NSE\n", numbytes);
+
   router_log("INIT");
+  
   return 0;
 }
 
@@ -45,26 +64,59 @@ void usage(int argc) {
 int main (int argc, char** argv) {
   int router_id;
   char nse_host[128]; //max size of nse_host
-  int nse_port;
+  char nse_port[10]; 
   int router_port;
 
   if (argc != 5) {
     // error incorrect number of arguments
     usage(argc);
-  } else {
-    //correct number of arguments, start the router
-    router_id = atoi(argv[1]);
-    strcpy(nse_host, argv[2]);
-    nse_port = atoi(argv[3]);
-    router_port = atoi(argv[4]);
-    printf("main - Starting the router\n");
-
-    // set filename
-    sprintf(filename, "router%d.log", router_id);
-
-    send_init(router_id);
-
-
+    exit(1);
   } 
+
+  //correct number of arguments, start the router
+  router_id = atoi(argv[1]);
+  strcpy(nse_host, argv[2]);
+  strcpy(nse_port, argv[3]);
+  router_port = atoi(argv[4]);
+  printf("main - Starting the router\n");
+
+  // set filename
+  sprintf(filename, "router%d.log", router_id);
+
+  // set up the datagram socket
+  // socket related variables
+  int sockfd;
+  struct addrinfo hints, *servinfo, *p;
+  int rv;
+
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_DGRAM;
+
+  if ((rv = getaddrinfo(nse_host, nse_port, &hints, &servinfo)) != 0) {
+     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+     return 1;
+  }
+
+  // loop through all the results and make a socket
+  for(p = servinfo; p != NULL; p = p->ai_next) {
+     if ((sockfd = socket(p->ai_family, p->ai_socktype,
+             p->ai_protocol)) == -1) {
+         perror("router: socket");
+         continue;
+     }
+     break;
+  }
+
+  if (p == NULL) {
+     fprintf(stderr, "router: failed to bind socket\n");
+     return 2;
+  }
+
+  // send init to the NSE
+  send_init(p, sockfd, router_id);
+
+  //recv database from NSE
+
   return 0;
 }
