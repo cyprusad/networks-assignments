@@ -10,7 +10,10 @@
 #include <netdb.h>
 #include <unistd.h>
 
+#include <string>
 #include <map>
+#include <sstream>
+#include <cstring>
 
 #include "router.h"
 
@@ -27,6 +30,9 @@ int router_port;
 char filename[64]; // filename string specific to the router
 struct circuit_DB circuit; // circuit DB provided by the NSE 
 map<int, int> nbr_ids; // if nbr_ids.count(link_id) > 0, then router_id is a neighbour, else nbr_ids[link_id] = router_id
+
+map< int, map<int, int> > topology;
+map< int, map<int, int> > routing_table;
 
 // socket related variables
 int sockfd;
@@ -59,6 +65,36 @@ int router_log(char* data) {
   return res; //return 1 if things went well
 }
 
+string prepare_topology(int router_id) {
+  stringstream ss;
+  map< int, map<int, int> >::iterator it1;
+  map<int,int>::iterator it2;
+  ss << "# Topology database" << endl;
+  for (it1 = topology.begin(); it1 != topology.end() ; ++it1) {
+    ss << "R" << router_id << " -> " << "R" << it1->first << " nbr link " << it1->second.size() << endl;
+    for (it2 = it1->second.begin(); it2 != it1->second.end(); ++it2) {
+      ss << "R" << router_id << " -> " << "R" << it1->first << " link " << it2->first << " cost " << it2->second << endl;
+    }
+  }
+  return ss.str();
+}
+
+string prepare_routing_table(int router_id) {
+  stringstream ss;
+  map< int, map<int, int> >::iterator it1;
+  map<int,int>::iterator it2;
+  ss << "# RIB" << endl;
+  for (it1 = routing_table.begin(); it1 != routing_table.end() ; ++it1) {
+    for (it2 = it1->second.begin(); it2 != it1->second.end(); ++it2) {
+      if (it2->first == -1) {
+        ss << "R" << router_id << " -> " << "R" << it1->first << " -> Local, 0" << endl; 
+      } else {
+        ss << "R" << router_id << " -> " << "R" << it1->first << " -> " << "R" << it2->first << ", " << it2->second << endl;
+      }
+    }
+  }
+  return ss.str();
+}
 
 int send_init(int router_id) {
   int numbytes;
@@ -153,6 +189,35 @@ void receive_circuitDB(int router_id) {
   char logging[50];
   sprintf(logging, "R%d:RECEIVE - circuitDB from the emulator\n", router_id);
   router_log(logging);
+
+  // initialize topology
+  int i;
+  for (i = 0; i < circuit.nbr_link; i++) {
+    int link_id = circuit.linkcost[i].link;
+    int cost = circuit.linkcost[i].cost;
+    if (topology.count(router_id) > 0) {
+      topology[router_id][link_id] = cost;
+    } else {
+      map<int, int> link_cost_map;
+      link_cost_map[link_id] = cost;
+      topology[router_id] = link_cost_map;
+    }
+  }
+
+  // initialize routing table
+  map<int,int> via_cost_map;
+  via_cost_map[-1] = 0; // for self, we are local and takes 0 cose to get here
+  routing_table[router_id] = via_cost_map;
+
+  //log the change in topology & routing table
+  string data;
+  char log_output[4096];
+  data = prepare_topology(router_id);
+  strcpy(log_output, data.c_str());
+  router_log(log_output);
+  data = prepare_routing_table(router_id);
+  strcpy(log_output, data.c_str());
+  router_log(log_output); 
 }
 
 
