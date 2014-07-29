@@ -190,7 +190,7 @@ void heavy_lifting(int router_id) {
       printf("heavy_lifting - R%d is already a neighbour\n", nbr_ids[hello.link_id]);
     } else {
       printf("heavy_lifting - R%d added as a neighbour\n", hello.router_id);
-      nbr_ids[hello.router_id] = hello.link_id;
+      nbr_ids[hello.link_id] = hello.router_id;
     }
     usleep(20);
     // send multiple LSPDU packets to the neighbors
