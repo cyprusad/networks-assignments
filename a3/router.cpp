@@ -49,6 +49,7 @@ void* get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
+// general purpose method to log to the file
 int router_log(char* data) {
   int res = 0;
   if (filename != NULL) {
@@ -65,6 +66,7 @@ int router_log(char* data) {
   return res; //return 1 if things went well
 }
 
+// prepare the output for the topology state at this router
 string prepare_topology(int router_id) {
   stringstream ss;
   map< int, map<int, int> >::iterator it1;
@@ -79,6 +81,7 @@ string prepare_topology(int router_id) {
   return ss.str();
 }
 
+// prepare the output for the routing table state at this router
 string prepare_routing_table(int router_id) {
   stringstream ss;
   map< int, map<int, int> >::iterator it1;
@@ -96,6 +99,7 @@ string prepare_routing_table(int router_id) {
   return ss.str();
 }
 
+// send pkt_INIT to the NSE
 int send_init(int router_id) {
   int numbytes;
 
@@ -118,12 +122,13 @@ int send_init(int router_id) {
 
   // log this message
   char logging[30];
-  sprintf(logging, "R%d:SEND - INIT\n", router_id);
+  sprintf(logging, "R%d :: Send - INIT\n", router_id);
   router_log(logging);
   
   return 0;
 }
 
+// send pkt_HELLO to neighboring routers
 int send_hello(int router_id, struct circuit_DB* circuit) {
   int numbytes;
 
@@ -155,14 +160,14 @@ int send_hello(int router_id, struct circuit_DB* circuit) {
 
     // log this message
     char logging[50];
-    sprintf(logging, "R%d:SEND - HELLO to link_id:%d\n", router_id, hello.link_id);
+    sprintf(logging, "R%d :: Send - pkt_HELLO to link_id:%d\n", router_id, hello.link_id);
     router_log(logging);
   }
 
-  
   return 0;
 }
 
+// receive circuit_DB from the NSE
 void receive_circuitDB(int router_id) {
   char s[INET6_ADDRSTRLEN];
   unsigned char recvBuffer[64]; //max 44 bytes
@@ -187,7 +192,7 @@ void receive_circuitDB(int router_id) {
 
   // log the receipt of this message
   char logging[50];
-  sprintf(logging, "R%d:RECEIVE - circuitDB from the emulator\n", router_id);
+  sprintf(logging, "R%d :: Receive - circuitDB from the emulator\n", router_id);
   router_log(logging);
 
   // initialize topology
@@ -220,7 +225,7 @@ void receive_circuitDB(int router_id) {
   router_log(log_output); 
 }
 
-
+// multipurpose method to receive pkt_HELLO and pkt_LSPDU and respond accordingly
 void heavy_lifting(int router_id) {
   char s[INET6_ADDRSTRLEN];
   unsigned char recvBuffer[sizeof(struct pkt_LSPDU)]; //max of 5 ints
@@ -248,7 +253,7 @@ void heavy_lifting(int router_id) {
     memcpy(&hello, recvBuffer, sizeof(hello));
     // log receiving the HELLO
     char logging[124];
-    sprintf(logging, "R%d:RECEIVE - pkt_HELLO from R%d and link_id=%d\n", router_id, hello.router_id, hello.link_id);
+    sprintf(logging, "R%d :: Receive - pkt_HELLO from R%d and link_id=%d\n", router_id, hello.router_id, hello.link_id);
     router_log(logging);
     // generate the neighbors list
     if (nbr_ids.count(hello.link_id) > 0) {
@@ -284,7 +289,7 @@ void heavy_lifting(int router_id) {
 
       // log sending the LSPDU
       char logging[256];
-      sprintf(logging, "R%d:SEND LSPDU packet via link_id=%d\n", router_id, pdu.via);
+      sprintf(logging, "R%d :: Send pkt_LSPDU packet via link_id=%d\n", router_id, pdu.via);
       router_log(logging);
     }
 
@@ -296,6 +301,7 @@ void heavy_lifting(int router_id) {
   }
 }
 
+// usage for the command line arguments
 void usage(int argc) {
   printf("Incorrect number of arguments. Required 4 but provided %d\n", --argc);
   printf("Usage:\n\trouter <router_id> <nse_host> <nse_port> <router_port>\n");
