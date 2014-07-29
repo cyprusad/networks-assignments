@@ -88,19 +88,21 @@ int send_hello(struct addrinfo* p, int sockfd, int router_id, struct circuit_DB*
   if (circuit == NULL) {
     printf("send_hello - circuit DB wasn't correctly set up");
   }
+  printf("send_hello - circuit DB properly set up\n");
 
   //send hello messages to neighbors
   unsigned int num_nbrs = circuit->nbr_link;
   struct pkt_HELLO greetings[num_nbrs];
   unsigned char* data = (unsigned char*)malloc(sizeof(struct pkt_HELLO));
   int i;
-  char logging[50];
   for (i=0; i < num_nbrs; i++) {
     memset(data, 0, sizeof(struct pkt_HELLO)); //clear data from prev iteration
     struct pkt_HELLO hello;
     hello.router_id = router_id;
     hello.link_id = circuit->linkcost[i].link;
     memcpy(data, &hello, sizeof(hello)); //copy hello packet into data
+
+    printf("send_hello - R%d sending hello on link number=%d\n", router_id, i);
 
     if ((numbytes = sendto(sockfd, data, sizeof(hello), 0,
                  p->ai_addr, p->ai_addrlen)) == -1) {
@@ -111,9 +113,9 @@ int send_hello(struct addrinfo* p, int sockfd, int router_id, struct circuit_DB*
     printf("send_hello - we sent %d bytes to the NSE\n", numbytes);
 
     // log this message
+    char logging[50];
     sprintf(logging, "R%d:SEND - HELLO to link_id:%d\n", router_id, hello.link_id);
     router_log(logging);
-    memset(&logging, 0, strlen(logging));
   }
 
   
@@ -197,12 +199,14 @@ int main (int argc, char** argv) {
      return 2;
   }
 
+
   // send init to the NSE
   send_init(p, sockfd, router_id);
 
   //recv database from NSE
   receive_circuitDB(sockfd, router_id);
 
+  printf("main - sending HELLOs\n");
   // send hello to all the neighbours
   send_hello(p, sockfd, router_id, &circuit);
 
