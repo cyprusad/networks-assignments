@@ -33,13 +33,6 @@ int main (int argc, char** argv) {
   
   }
 
-  int n = 1;
-  // little endian if true
-  if(*(char *)&n == 1) {
-    printf("LITTLE ENDIAN\n");
-  } else {
-    printf("BIG ENDIAN\n");
-  }
-  
+ 
   return 0;
 }
