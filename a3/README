@@ -1,0 +1,11 @@
+Assignment 3 
+============
+
+Saiprasad Warang - swarang - 20325839
+
+Instructions to run:
+./router <router_id> <nse_host> <nse_port> <router_port>
+
+This code has been tested on ubuntu1204-006 and ubuntu1204-004 in the linux CS undergrad machines
+
+Using GNU Make 3.81 and g++ 4.6.3 to compile
