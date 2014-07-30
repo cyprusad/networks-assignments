@@ -14,6 +14,7 @@
 #include <map>
 #include <sstream>
 #include <cstring>
+#include <climits>
 
 #include "router.h"
 
@@ -212,9 +213,13 @@ void receive_circuitDB(int router_id) {
   }
 
   // initialize routing table
-  for (i=0; i < 5; i++) {
+  for (i=1; i < 6; i++) {
     map<int,int> via_cost_map;
-    via_cost_map[-1] = 0; 
+    if (i == router_id) {
+      via_cost_map[-1] = 0;
+    } else {
+      via_cost_map[-1] = UINT_MAX; 
+    }
     routing_table[i] = via_cost_map;
   }
 
@@ -357,7 +362,7 @@ void heavy_lifting(int router_id) {
             memset(data, 0, sizeof(struct pkt_LSPDU)); //clear data from prev iteration
             memcpy(data, &pdu, sizeof(pdu)); //copy pdu packet into data
 
-            printf("heavy_lifiting - R%d relaying PDU via link=%d\n", pdu.sender, pdu.via);
+            printf("heavy_lifting - R%d relaying PDU via link=%d\n", pdu.sender, pdu.via);
 
             if ((numbytes = sendto(sockfd, data, sizeof(pdu), 0,
                          p->ai_addr, p->ai_addrlen)) == -1) {
