@@ -212,9 +212,11 @@ void receive_circuitDB(int router_id) {
   }
 
   // initialize routing table
-  map<int,int> via_cost_map;
-  via_cost_map[-1] = 0; // for self, we are local and takes 0 cose to get here
-  routing_table[router_id] = via_cost_map;
+  for (i=0; i < 5; i++) {
+    map<int,int> via_cost_map;
+    via_cost_map[-1] = 0; 
+    routing_table[i] = via_cost_map;
+  }
 
   //log the change in topology & routing table
   string data;
@@ -227,6 +229,7 @@ void receive_circuitDB(int router_id) {
   router_log(log_output); 
 }
 
+// return 0 if the received PDU doesn't udpate the topology
 int update_topology(struct pkt_LSPDU* pdu) {
   if (topology.count(pdu->router_id) > 0) {
     if (topology[pdu->router_id].count(pdu->link_id) > 0) {
@@ -240,6 +243,12 @@ int update_topology(struct pkt_LSPDU* pdu) {
     topology[pdu->router_id] = link_cost_map;
   }
   return 1; // change happened
+}
+
+// run the Dijkstra algorithm and find the shortest paths to all visible routers
+int update_routing_table(struct pkt_LSPDU* pdu) {
+
+  return 0;
 }
 
 // multipurpose method to receive pkt_HELLO and pkt_LSPDU and respond accordingly
@@ -306,7 +315,7 @@ void heavy_lifting(int router_id) {
 
       // log sending the LSPDU
       char logging[256];
-      sprintf(logging, "R%d :: Send pkt_LSPDU packet via link_id=%d\n", router_id, pdu.via);
+      sprintf(logging, "R%d :: Send pkt_LSPDU - sender=%d, router_id=%d, link_id=%d, cost=%d, via=%d\n", router_id, pdu.sender, pdu.router_id, pdu.link_id, pdu.cost, pdu.via);
       router_log(logging);
     }
 
@@ -323,13 +332,48 @@ void heavy_lifting(int router_id) {
     // update topology and routing table (return 1 if there is a change, if not then 0 - that way we will know if we should send PDUs forward)
     int res = update_topology(&pdu);
     if (res != 0) { // proceed only if there was an update to the topology
-      //Dijkstra algorithm - shortest path
+      // Dijkstra algorithm - shortest path
+      res = update_routing_table(&pdu);
 
       // log the changes of topology and routing table
+      string log_str;
+      char log_output[4096];
+      log_str = prepare_topology(router_id);
+      strcpy(log_output, log_str.c_str());
+      router_log(log_output);
+      log_str = prepare_routing_table(router_id);
+      strcpy(log_output, log_str.c_str());
+      router_log(log_output); 
 
       // send PDU to other routers if update happened
+      // send to everyone except those who didn't send HELLO and the one who sent the LSPDU
+      unsigned char* data = (unsigned char*)malloc(sizeof(struct pkt_LSPDU));
+      int i;
+      for (i=0; i < circuit.nbr_link; i++) {
+        if (nbr_ids.count(circuit.linkcost[i].link) > 0) { // we have received a pkt_HELLO from this neighbour
+          if (nbr_ids[circuit.linkcost[i].link] != pdu.sender) { //don't send PDU back to the sender
+            pdu.sender = router_id;
+            pdu.via = circuit.linkcost[i].link;
+            memset(data, 0, sizeof(struct pkt_LSPDU)); //clear data from prev iteration
+            memcpy(data, &pdu, sizeof(pdu)); //copy pdu packet into data
+
+            printf("heavy_lifiting - R%d relaying PDU via link=%d\n", pdu.sender, pdu.via);
+
+            if ((numbytes = sendto(sockfd, data, sizeof(pdu), 0,
+                         p->ai_addr, p->ai_addrlen)) == -1) {
+              perror("router: sendto");
+              exit(1);
+            }
+
+            printf("heavy_lifting :: relayed_pdu - we relayed %d bytes to the NSE\n", numbytes);
+
+          }
+        }
+      }
 
       // log the sending of PDU
+      sprintf(logging, "R%d :: Send pkt_LSPDU - sender=%d, router_id=%d, link_id=%d, cost=%d, via=%d\n", router_id, pdu.sender, pdu.router_id, pdu.link_id, pdu.cost, pdu.via);
+      router_log(logging);
     } 
     
 
