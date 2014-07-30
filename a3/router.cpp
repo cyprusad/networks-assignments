@@ -295,6 +295,22 @@ void heavy_lifting(int router_id) {
 
   } else if (numbytes == sizeof(struct pkt_LSPDU)) {
     printf("heavy_lifting - received an LSPDU packet\n");
+
+    struct pkt_LSPDU pdu;
+    memcpy(&pdu, recvBuffer, sizeof(pdu));
+    // log receiving the LSPDU
+    char logging[400];
+    sprintf(logging, "R%d :: Received pkt_LSPDU - sender=%d, router_id=%d, link_id=%d, cost=%d, via=%d\n", router_id, pdu.sender, pdu.router_id, pdu.link_id, pdu.cost, pdu.via);
+    router_log(logging);
+
+    // update topology and routing table (return 1 if there is a change, if not then 0 - that way we will know if we should send PDUs forward)
+
+    // log the changes of topology and routing table
+
+    // send PDU to other routers if update happened
+
+    //log the sending of PDU
+
   } else {
     printf("heavy_lifting - received a bad packet\n");
     exit(1);
