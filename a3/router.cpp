@@ -89,9 +89,11 @@ string prepare_routing_table(int router_id) {
   ss << "# RIB" << endl;
   for (it1 = routing_table.begin(); it1 != routing_table.end() ; ++it1) {
     for (it2 = it1->second.begin(); it2 != it1->second.end(); ++it2) {
-      if (it2->first == -1) {
+      if (it1->first == router_id) {
         ss << "R" << router_id << " -> " << "R" << it1->first << " -> Local, 0" << endl; 
-      } else {
+      } else if (it2->first == -1) {
+        ss << "R" << router_id << " -> " << "R" << it1->first << " -> INF, INF"<< endl; 
+      }else {
         ss << "R" << router_id << " -> " << "R" << it1->first << " -> " << "R" << it2->first << ", " << it2->second << endl;
       }
     }
@@ -225,6 +227,21 @@ void receive_circuitDB(int router_id) {
   router_log(log_output); 
 }
 
+int update_topology(struct pkt_LSPDU* pdu) {
+  if (topology.count(pdu->router_id) > 0) {
+    if (topology[pdu->router_id].count(pdu->link_id) > 0) {
+      return 0; // link already exists in the topology
+    } else {
+      topology[pdu->router_id][pdu->link_id] = pdu->cost;
+    }
+  } else {
+    map<int,int> link_cost_map;
+    link_cost_map[pdu->link_id] = pdu->cost;
+    topology[pdu->router_id] = link_cost_map;
+  }
+  return 1; // change happened
+}
+
 // multipurpose method to receive pkt_HELLO and pkt_LSPDU and respond accordingly
 void heavy_lifting(int router_id) {
   char s[INET6_ADDRSTRLEN];
@@ -304,12 +321,17 @@ void heavy_lifting(int router_id) {
     router_log(logging);
 
     // update topology and routing table (return 1 if there is a change, if not then 0 - that way we will know if we should send PDUs forward)
+    int res = update_topology(&pdu);
+    if (res != 0) { // proceed only if there was an update to the topology
+      //Dijkstra algorithm - shortest path
 
-    // log the changes of topology and routing table
+      // log the changes of topology and routing table
 
-    // send PDU to other routers if update happened
+      // send PDU to other routers if update happened
 
-    //log the sending of PDU
+      // log the sending of PDU
+    } 
+    
 
   } else {
     printf("heavy_lifting - received a bad packet\n");
