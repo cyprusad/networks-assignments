@@ -250,8 +250,56 @@ int update_topology(struct pkt_LSPDU* pdu) {
   return 1; // change happened
 }
 
+int find_cost_of_path(int first_link, int start, int end) {
+  map<int, map<int,int> >::iterator it;
+  map<int,int>::iterator path;
+  int cumulative_cost = 0;
+  int i;
+  cumulative_cost += topology[start][first_link];
+  for (i = 1; i < 6; i++) {
+    if (i != start) { //shortest path to ourself is zero
+      path = topology[i].find(first_link);
+      if (path != topology[i].end()) {
+        if (i == end) {
+          return cumulative_cost;
+        } else {
+          for(path=topology[i].begin(); path!=topology[i].end(); ++path) {
+            cumulative_cost = find_cost_of_path(path->first, i, end);
+          }
+        }
+      }
+    }
+  }
+  return -1;
+}
+
+
+int parent_funct(int start, int end) {
+  map<int,int>::iterator path;
+  int cost;
+  for(path=topology[start].begin(); path!=topology[start].end(); ++path) {
+    cost = find_cost_of_path(path->first, start, end);
+  }
+  return cost;
+}
+
 // run the Dijkstra algorithm and find the shortest paths to all visible routers
-int update_routing_table(struct pkt_LSPDU* pdu) {
+int update_routing_table(int router_id) {
+  map<int, map<int,int> >::iterator it;
+  
+  int i,j;
+  int end_node;
+  // shortest path for all routers from us
+  for (i = 1; i < 6; i++) {
+    if (i != router_id) { //shortest path to ourself is zero
+      if ((it = topology.find(i)) != topology.end()) { 
+        // the end router is actually present in our topology so we can find a path to it
+        end_node = it->first;
+        parent_funct(router_id, end_node);
+
+      }
+    }
+  }
 
   return 0;
 }
@@ -338,7 +386,7 @@ void heavy_lifting(int router_id) {
     int res = update_topology(&pdu);
     if (res != 0) { // proceed only if there was an update to the topology
       // Dijkstra algorithm - shortest path
-      res = update_routing_table(&pdu);
+      res = update_routing_table(router_id);
 
       // log the changes of topology and routing table
       string log_str;
